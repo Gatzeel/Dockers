@@ -1,0 +1,73 @@
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    environment:
+      - TZ=Europe/Warsaw
+    volumes:
+      - ~/docker/homeassistant:/config
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  glances:
+    container_name: glances
+    image: nicolargo/glances
+    restart: unless-stopped
+    ports:
+      - "61208:61208"
+    environment:
+      - GLANCES_OPT=-w
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /:/host:ro
+    pid: "host"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  plex:
+    container_name: plex
+    image: linuxserver/plex:latest
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Warsaw
+    volumes:
+      - ~/docker/plex:/config
+      - /mnt/server1:/mnt/server1
+      - /mnt/server2:/mnt/server2
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TZ: "Europe/Warsaw"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_MONITOR_ONLY: "true"
+      WATCHTOWER_SCHEDULE: "0 0 3 * * *"
+      WATCHTOWER_NOTIFICATION_REPORT: "true"
+      WATCHTOWER_NOTIFICATION_URL: "generic+http://192.168.1.104:8123/api/webhook/docker_update_alert?template=json"
+      WATCHTOWER_NOTIFICATION_TEMPLATE: |
+        {
+          "title": "Watchtower Logs",
+          "entries": [
+            {{- range $$index, $$entry := .Entries }}
+              {{- if $$index}},{{end}}
+              {
+                "time": "{{ $$entry.Time }}",
+                "level": "{{ $$entry.Level }}",
+                "message": "{{ $$entry.Message }}"
+              }
+            {{- end }}
+          ]
+        }
